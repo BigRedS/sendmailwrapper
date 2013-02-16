@@ -1,0 +1,7 @@
+---
+  package: sendmailwrapper
+  maintainer: Avi Greenbury <ialoneambest@gmail.com>
+  description: Logging/blacklisting sendmail wrapper for PHP
+  requires:
+    perl: 0
+    

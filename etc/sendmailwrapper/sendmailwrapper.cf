@@ -1,0 +1,40 @@
+# To determine whether to send a given email, two things are 
+# checked - the working directory when the mail was sent (which
+# is normally a subdirectory of the DocumentRoot of the website
+# doing the sending) and the name of the script as deduced by 
+# the x-php-script header introduced in PHP 5.2
+#
+# For either, you may have a whitelist or a blacklist; if you
+# set both the whitelist is canonical and the blacklist is simply 
+# never read
+
+# The pwd check includes subdirectories - if the pwd of the
+# email begins with something on the list, that's a match. It
+# is a naive string match, rather than a true subdir check.
+pwdblacklist = /etc/sendmailwrapper/pwdblacklist
+#pwdwhitelist = /etc/sendmailwrapper/pwdwhitelist
+
+# The script check works on an exact match. The script name is 
+# taken to be everything beyond the last forward-slash in the
+# x-php-script header.
+scriptblacklist = /etc/sendmailwrapper/scriptblacklist
+#scriptwhitelist = /etc/sendmwailwrapper/scriptwhitelist
+
+# The sendmail binary around which we shall wrap. Arguments are
+# passed straight on unchanged.
+sendmail = /usr/lib/sendmail
+
+# Sent mail is logged differently to blacklisted mail to 
+# make it easier to see what's contributing to a queue.
+sentlog = /tmp/sendmailwrapper.sent
+blacklistlog = /tmp/sendmailwrapper.blacklisted
+
+# Most errors are caused by a lack of permission to read or write 
+# somewhere, error log defaults to being in /tmp where everybody 
+# should be able to read:
+errorlog = /tmp/sendmailwrapper.error
+
+# This is the message printed to stdout when a mail is not
+# sent because it failed a black/white list check. Some sites
+# will report it to the user.
+message = "Mail sending barred. Please contact support"

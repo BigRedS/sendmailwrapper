@@ -22,9 +22,9 @@ while(<STDIN>){
 		$emaildata->{'from'} = $1;
 	}elsif(/^subject:\s*(.+)\s*$/i){
 		$emaildata->{'subject'} = $1;
-	}elsif(/^x-php-script:\s*(\S+)\s*for\s*(\S+)s*$/i){
-		$emaildata->{'script'} = $1;
-		$emaildata->{'client'} = $2;
+	}elsif(/^x-php-(originating-)?script:\s*(\S+)\s*for\s*(\S+)s*$/i){
+		$emaildata->{'script'} = $2;
+		$emaildata->{'client'} = $3;
 		$emaildata->{'scriptfilename'} = (split("/", $emaildata->{'script'}))[-1];
 	}
 	push(@message, $_);

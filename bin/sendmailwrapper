@@ -9,6 +9,9 @@ my $c = parseConfigFile($f_config);
 $c->{'errorlog'} = "/tmp/sendmailwrapper.error" if(!defined($c->{'errorlog'}));
 
 #TODO: taint mode
+#TODO: logrotate config has a prerun script to send a report to someone
+#TODO: include spamstats script
+#  TODO: make spamstats more generic? 
 
 
 # Parse headers to get stuff to log/judge with:

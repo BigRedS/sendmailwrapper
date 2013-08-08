@@ -4,4 +4,6 @@
   description: Logging/blacklisting sendmail wrapper for PHP
   requires:
     perl: 0
-    
+  dir_map: 
+    scripts : /usr/local/scripts/bin
+		var: /var

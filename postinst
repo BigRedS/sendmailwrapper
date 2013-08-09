@@ -1,0 +1,5 @@
+#! /bin/sh
+mkdir /var/log/sendmailwrapper
+chmod a+wx /var/log/sendmailwrapper
+chmod a+r /var/log
+

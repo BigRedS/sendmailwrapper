@@ -1,9 +1,8 @@
----
-  package: sendmailwrapper
-  maintainer: Avi Greenbury <ialoneambest@gmail.com>
-  description: Logging/blacklisting sendmail wrapper for PHP
-  requires:
-    perl: 0
-  dir_map: 
-    scripts : /usr/local/scripts/bin
-		var: /var
+--- 
+description: "Logging/blacklisting sendmail wrapper for PHP"
+dir_map: 
+  scripts: /usr/local/scripts/bin
+maintainer: "Avi Greenbury <ialoneambest@gmail.com>"
+package: sendmailwrapper
+requires: 
+  perl: 0

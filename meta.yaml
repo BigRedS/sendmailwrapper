@@ -1,4 +1,6 @@
 --- 
+dir_map:
+  logrotate: /etc/logrotate.d
 description: "Logging/blacklisting sendmail wrapper for PHP"
 maintainer: "Avi Greenbury <ialoneambest@gmail.com>"
 package: sendmailwrapper

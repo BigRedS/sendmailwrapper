@@ -1,0 +1,9 @@
+/var/log/sendmailwrapper/*log {
+	daily
+	missingok
+	rotate 62
+	compress
+	delaycompress
+	ifempty
+	nocreate 
+}

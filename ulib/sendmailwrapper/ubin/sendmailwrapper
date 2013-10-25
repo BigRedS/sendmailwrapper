@@ -1,0 +1,209 @@
+#! /usr/bin/perl
+use strict;
+
+my $f_config = "/etc/sendmailwrapper/sendmailwrapper.cf";
+
+#$f_config = "./sendmailwrapper.cf" if( -f "./sendmailwrapper.cf");
+
+my $c = parseConfigFile($f_config);
+$c->{'errorlog'} = "/tmp/sendmailwrapper.error" if(!defined($c->{'errorlog'}));
+
+#TODO: taint mode
+#TODO: logrotate config has a prerun script to send a report to someone
+#TODO: include spamstats script
+#  TODO: make spamstats more generic? 
+
+
+# Parse headers to get stuff to log/judge with:
+my $emaildata;
+$emaildata->{'pwd'} = $ENV{'PWD'};
+my ($to, $from, $subject, $phpScript, $client, @message);
+while(<STDIN>){
+	if (/^to:\s*(.+)\s*$/i){ 
+		$emaildata->{'to'} = $1;
+	}elsif(/^from:\s*(.+)\s*$/i){
+		$emaildata->{'from'} = $1;
+	}elsif(/^subject:\s*(.+)\s*$/i){
+		$emaildata->{'subject'} = $1;
+	}elsif(/^x-php-(originating-)?script:\s*(\S+)\s*for\s*(\S+)s*$/i){
+		$emaildata->{'script'} = $2;
+		$emaildata->{'client'} = $3;
+		$emaildata->{'scriptfilename'} = (split("/", $emaildata->{'script'}))[-1];
+	}
+	push(@message, $_);
+}
+if(-f $c->{'pwdblacklist'} || -f $c->{'pwdwhitelist'}){
+	if(pwdIsBarred($c, $emaildata)){
+		$emaildata->{'blacklist'} = "pwd";
+		blacklist($emaildata);
+		print "$c->{'message'}\n";
+		exit 2
+	}
+}
+
+if(-f $c->{'scriptblacklist'} || -f $c->{'scriptwhitelist'}){
+	if(scriptIsBarred()){
+		$emaildata->{'blacklist'} = "pwd";
+		blacklist($emaildata);
+		print "$c->{'message'}\n";
+		exit 2
+	}
+}
+# Write to the log, send the mail and exit:
+_log();
+sendmail(\@message, \@ARGV);
+exit 0;
+
+# # # # #
+# # # #
+# # #
+# #  
+#
+
+
+
+sub scriptIsBarred{
+	my $list;
+	if(defined($c->{'scriptwhitelist'})){
+		$list = getList($c->{'scriptwhitelist'});
+		unless(defined($list->{$emaildata->{'scriptfilename'}})){
+			#script is not on whitelist
+			return "script";
+		}
+	}elsif(defined($c->{'scriptblacklist'}) && defined($emaildata->{'scriptfilename'})){
+		$list = getList($c->{'scriptblacklist'});
+		if(defined($list->{$emaildata->{'scriptfilename'}})){
+			#script is on blacklist
+			$emaildata->{'blacklist'} = 'script';
+			return "script";
+		}
+	}
+	#If we're here, script is either whitelisted or not-blacklisted.
+	return;
+}
+
+sub pwdIsBarred {
+	# If the PWD begins with anything on the blacklist
+	# then the mail wont be sent. If it begins with 
+	# anything on the whitelist then it will be sent. 
+	my $list;
+	if(defined($c->{'pwdwhitelist'})){
+		$list = getList($c->{'pwdwhitelist'});
+		my $whitelisted = 0;
+		foreach(keys(%$list)){
+			if($emaildata->{'pwd'} =~ m/^$_/){
+			#pwd is whitelisted
+				return;
+			}
+		}
+		#if we're here, pwd wasn't on the whitelist.
+		return "pwd";
+	}elsif(defined($c->{'pwdblacklist'})){
+		$list = getList($c->{'pwdblacklist'});
+		foreach(keys(%$list)){
+			if($emaildata->{'pwd'} =~ m/^$_/){
+				return "pwd";
+			}
+		}
+	}
+	return;
+}
+
+
+sub blacklist{
+	my $emaildata = shift;
+	my $logLine = createLogLine($emaildata);
+	my $fh_log;
+	eval{
+		open($fh_log, ">>", $c->{'blacklistlog'}) or die "Error opening blacklist log file '$c->{'blacklistlog'}";
+	};
+	if($@){
+		_error($@);
+	}else{
+		print $fh_log $logLine;
+	}
+	print $c->{'message'};
+	exit 1;
+}
+
+sub getList{
+	my $f_list = shift;
+	my $fh_list;
+	eval{
+		open($fh_list, "<", $f_list) or die "Couldn't open list file $f_list : $!";
+	};
+	if($@){
+		_error($@, "noexit");
+		return;
+	}
+	my $list;
+	while(readline($fh_list)){
+		chomp;
+		$list->{$_} = "";
+	}
+	return $list;
+}
+
+sub sendmail{
+	my $message = shift;
+	my $args = shift;
+	open( my $sendmail, "| $c->{'sendmail'}  @$args") 
+	   or _error("error creating pipe to sendmail with \" | $c->{'sendmail'} ".join(" ", @$args)."\"\n");
+	foreach(@$message){
+		print $sendmail $_;
+	}
+	close $sendmail;
+}
+
+sub createLogLine{
+	my $data = shift || $emaildata;
+	my $l = getTime();
+	if(defined($data->{'blacklist'})){
+		$l.=" BLACKLIST($data->{'blacklist'}) ";
+	}else{
+		$l.=" SENT ";
+	}
+	$l.= "PWD: $data->{'pwd'} ";
+	$l.= "SCRIPT: $data->{'script'} ";
+	$l.= "SCRIPTFILE: $data->{'scriptfilename'} ";
+	$l.= "CLIENT: $data->{'client'} ";
+	$l.= "TO: $data->{'to'} ";
+	$l.= "FROM: $data->{'from'} ";
+	$l.= "PWD: $data->{'pwd'} ";
+	$l.= "ARGS: $data->{'args'}";
+	$l.= "\n";
+	return $l
+}
+
+sub _log {
+	my $logline = createLogLine();
+	open(my $fh_log, ">>", $c->{'sentlog'}) or _error ("Unable to write to log file $c->{'sentlog'}\n", "noexit");
+	print $fh_log $logline;
+	close($fh_log);
+}
+
+sub _error {
+	my $message = shift;
+	my $exit = shift;
+	my $logLine = $message." ".createLogLine();
+	open( my $log, ">>", $c->{'errorlog'});
+	print $log $logLine;
+	exit 1 unless $exit =~ /noexit/i;
+}
+
+sub parseConfigFile{
+	my $f_config = shift;
+	open(my $fh_config, "<", $f_config) or _error("Couldn't open config file. Help! I have no idea what I'm doing!");
+	my $config;
+	while(readline($fh_config)){
+		next unless (/^\s*(\S+)\s*=\s*(.+)#?\s*/);
+		$config->{$1} = $2;
+	}
+	return $config;
+}
+
+sub getTime{
+	my $epoch=time();
+	my ($Y,$M,$D,$h,$m,$s)=(localtime($epoch))[5,4,3,2,1,0];
+	return sprintf("%d %d-%02d-%02d %02d:%02d:%02d", $epoch, $Y+1900, $M+1, $D, $h, $m, $s);
+}

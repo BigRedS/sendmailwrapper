@@ -1,24 +1,25 @@
 <?php
-
-$to = "test@localhost";
-$subject = "testing";
-$body = "This is just a test";
+$to      = getenv("SENDMAILWRAPPER_TO");
+$subject = getenv("SENDMAILWRAPPER_SUBJECT");
+$body    = getenv("SENDMAILWRAPPER_BODY");
+$headers = getenv("SENDMAILWRAPPER_HEADER")."\r\n";
 
 print "sendmail_path: " . ini_get('sendmail_path')."\n";
+print "cwd:           " . getcwd(). "\n";
+print "to:            $to\n";
+print "subject:       $subject\n";
+print "header:        ".getenv("SENDMAILWRAPPER_HEADER")."\n";
 
-print "Sending mail from cwd: " . mail($to, $subject, $body)."\n\n";
+print "Sending mail from cwd with no x-php-script header (should succeed):\n  ";
+print wordify(mail($to,$subject,$body));
 
-$headers = "x-php-script: example.net/badthings.php for 1.2.3.4\r\n";
+print "Sending mail from cwd with 'bad' x-php-script header (should fail):\n  ";
+print wordify(mail($to,$subject,$body,$headers));
 
-print "Setting PHP script to example.net/badthings.php\n";
-print "Sending mail from cwd: ". mail($to, $subject, $body, $headers). "\n\n";
-
-$headers = "x-php-script: example.net/goodthings.php for 1.2.3.4\r\n";
-
-print "Setting PHP script to example.net/goodthings.php\n";
-print "Sending mail from cwd: ". mail($to, $subject, $body, $headers). "\n\n";
-
-print "cding to /tmp\n";
+print "Sending mail from /tmp (should fail):\n  ";
 chdir('/tmp');
+print wordify(mail($to,$subject,$body));
 
-print "sending mail with no x-php-script header: ".mail($to, $subject, $body)."\n\n";
+function wordify($retval){
+	return ($retval > 0) ? " Succeeded\n" : " Failed\n";
+}

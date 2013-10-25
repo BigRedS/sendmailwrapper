@@ -1,8 +1,8 @@
 --- 
 dir_map:
   logrotate: /etc/logrotate.d
-	ubin:      /usr/bin
-	ulib:      /usr/lib
+  ubin:      /usr/bin
+  ulib:      /usr/lib
 description: "Logging/blacklisting sendmail wrapper for PHP"
 maintainer: "Avi Greenbury <ialoneambest@gmail.com>"
 package: sendmailwrapper

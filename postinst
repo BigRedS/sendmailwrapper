@@ -1,5 +1,5 @@
 #! /bin/sh
-mkdir /var/log/sendmailwrapper
-chmod a+wx /var/log/sendmailwrapper
-chmod a+r /var/log
+mkdir /var/log/sendmailwrapper || exit 1
+chmod a+wx /var/log/sendmailwrapper || exit 2
+chmod a+r /var/log || exit 3
 

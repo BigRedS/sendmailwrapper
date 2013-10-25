@@ -32,11 +32,11 @@ while(<STDIN>){
 	}
 	push(@message, $_);
 }
+
 if(-f $c->{'pwdblacklist'} || -f $c->{'pwdwhitelist'}){
 	if(pwdIsBarred($c, $emaildata)){
 		$emaildata->{'blacklist'} = "pwd";
-		blacklist($emaildata);
-		print "$c->{'message'}\n";
+		blacklist($emaildata, "9");
 		exit 2
 	}
 }
@@ -44,8 +44,7 @@ if(-f $c->{'pwdblacklist'} || -f $c->{'pwdwhitelist'}){
 if(-f $c->{'scriptblacklist'} || -f $c->{'scriptwhitelist'}){
 	if(scriptIsBarred()){
 		$emaildata->{'blacklist'} = "pwd";
-		blacklist($emaildata);
-		print "$c->{'message'}\n";
+		blacklist($emaildata, "12");
 		exit 2
 	}
 }
@@ -112,6 +111,7 @@ sub pwdIsBarred {
 
 sub blacklist{
 	my $emaildata = shift;
+	my $errCode = shift;
 	my $logLine = createLogLine($emaildata);
 	my $fh_log;
 	eval{
@@ -122,7 +122,7 @@ sub blacklist{
 	}else{
 		print $fh_log $logLine;
 	}
-	print $c->{'message'};
+	printf($c->{'message'}, $errCode); ;
 	exit 1;
 }
 

@@ -26,8 +26,8 @@ sendmail = /usr/lib/sendmail
 
 # Sent mail is logged differently to blacklisted mail to 
 # make it easier to see what's contributing to a queue.
-sentlog = /tmp/sendmailwrapper.sent
-blacklistlog = /tmp/sendmailwrapper.blacklisted
+sentlog = /var/log/sendmailwrapper/sent.log
+blacklistlog = /var/log/sendmailwrapper/blacklisted.log
 
 # Most errors are caused by a lack of permission to read or write 
 # somewhere, error log defaults to being in /tmp where everybody 
@@ -37,4 +37,9 @@ errorlog = /tmp/sendmailwrapper.error
 # This is the message printed to stdout when a mail is not
 # sent because it failed a black/white list check. Some sites
 # will report it to the user.
-message = "Mail sending barred. Please contact support"
+# A '%d' will be replaced with an error code. Currently there are
+# two:
+#    9 => working directory is blacklisted
+#   12 => x-php-script header is blacklisted
+# the number is inserted, not the text.
+message = "Mail sending barred (error %d). Please contact support"

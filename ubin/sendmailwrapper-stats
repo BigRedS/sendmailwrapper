@@ -1,0 +1,100 @@
+#! /usr/bin/perl
+
+use strict;
+
+my $d_logs = "/var/log/sendmailwrapper/";
+my (%pwd,%script,%client,%to,%fate);
+
+local $| = 1;
+print "Reading";
+foreach(listLogs()){
+	print " $_";
+	parseLog($_);
+}
+print "\n";
+
+print generalStats(\%pwd, \%script, \%client, \%to, \%fate);
+
+
+sub generalStats{
+	my ($pwd,$script,$client,$to,$fate) = @_;
+	my $output;;
+	$output.= "PWDs sending the most mail:\n";
+	$output.= sortHash($pwd, 10);
+	$output.= "Scripts sending the most mail:\n";
+	$output.= sortHash($script, 10);
+	$output.= "Clients with most mail:\n";
+	$output.= sortHash($client,10);
+#	$output.= "Recipients of the most mail:\n";
+#	$output.= sortHash($to,10);
+	$output.= "Mail Stats:\n";
+	$output.="   Sent:        ".$fate->{'SENT'}."\n";
+	$output.="   Blacklisted: ".$fate->{'BLACKLIST'}."\n";
+	$output.="   Sent:        ".blacklistRatio($fate)."%\n";
+	return $output;
+}
+
+# # # #
+# #
+#
+
+sub blacklistRatio{
+	my $fate =shift;
+	return sprintf("%02d", $fate->{'SENT'} / ($fate->{'BLACKLIST'} + $fate->{'SENT'} ) * 100);
+}
+
+sub sortHash(){
+	my $hash = shift;
+	my $maxCount = shift;
+	my $count = 0;
+	my $output;
+	foreach my $key (sort{ $hash->{$b} <=> $hash->{$a} } keys(%$hash)){
+		$count++;
+		last if $count > $maxCount;
+		$output.= "  $hash->{$key}\t$key\n";
+	}
+	return $output;
+}
+
+sub parseLog{
+	my $f_log = shift;
+	$f_log = $d_logs."/".$f_log;
+	my $fh;
+	eval {
+		open($fh, "<", $f_log) or die "Error opening log file '$f_log' : $!";
+	};
+	if($@){
+		_warn($@);
+		return;
+	}
+	while(<$fh>){
+		if(/(\S+) (\S+) (\S+) PWD:\s*(\S+)\s+SCRIPT:\s*(\S+)\s+CLIENT:\s*(\d+\.\d+\.\d+\.\d+)\s+/){ #   TO:"*([^"]*)\s+SUBJECT:"([^"]*)/){
+#WD: (.+) SCRIPT: (.+) CLIENT: (\d+\.\d+\.\d+\.\d+) TO: "?"([^"]+)" FROM\s*"([^"]+)" SUBJECT:\s*"([^"]+)"/){
+		my ($date,$time,$fate,$pwd,$script,$client,$to,$from,$subject) = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+#		my ($date,$time,$fate,undef,$pwd,undef,$script,undef,$client,$to) = split(/\s+/, $_);
+#		$to =~ s/^TO:"//;
+#		$to =~ s/"$//;
+			$pwd{$pwd}++;
+			$script{$script}++;
+			$client{$client}++;
+			$to{$to}++;
+			$fate{$fate}++;
+		}else{
+#			print $_."\n";
+		}
+	}
+}
+
+sub listLogs{
+	opendir(my $dh, $d_logs) or die ("Error opening '$d_logs' : $!");
+	my @logs = grep(/log(\.1)?$/, readdir($dh));
+#	my @logs = grep(/log$/, readdir($dh));
+	return @logs;
+}
+
+sub _warn{
+	my $message = shift;
+	chomp $message;
+	print STDERR $message."\n";
+
+}

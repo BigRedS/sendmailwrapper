@@ -1,21 +1,69 @@
 #! /usr/bin/perl
 
 use strict;
+use Getopt::Std;
+
+my %opt;
+getopts('d:b:hi:p:s:t:x:', \%opt);
+
+if($opt{'h'}){
+	print usage();
+	exit 0;
+}
 
 use constant sendmailwrapperBinary => $ENV{'SENDMAILWRAPPER_BINARY'} || "/usr/bin/sendmailwrapper";
 use constant sendmailwrapperDotPhp => $ENV{'SENDMAILWRAPPERDOTPHP'}  || "/usr/lib/sendmailwrapper/sendmailwrapper.php";
-use constant php => "/usr/bin/php5 --php-ini /etc/php5/conf.d/sendmailwrapper.ini";
 
-$ENV{'SENDMAILWRAPPER_TO'}      = 'test@localhost';
-$ENV{'SENDMAILWRAPPER_SUBJECT'} = 'Testing';
-$ENV{'SENDMAILWRAPPER_BODY'}    = 'This is just a test\n';
-$ENV{'SENDMAILWRAPPER_HEADER'} = 'x-php-script: example.net/badthings.php for 1.2.3.4';
-$ENV{'SENDMAILWRAPPER_CDDIR'}   = '/tmp';
-$ENV{'SENDMAILWRAPPER_BINARY'}  = sendmailwrapperBinary;
+my $phpDotIni = $opt{'i'} || "/etc/php5/conf.d/sendmailwrapper.ini";
+my $php = "/usr/bin/php5 --php-ini ".$phpDotIni;
 
-my $script = php." ".sendmailwrapperDotPhp;
+$ENV{'SENDMAILWRAPPER_TO'}      = $opt{'t'} || 'root@localhost';
+$ENV{'SENDMAILWRAPPER_SUBJECT'} = $opt{'s'} || 'Testing';
+$ENV{'SENDMAILWRAPPER_BODY'}    = $opt{'b'} || 'This is just a test\n';
+$ENV{'SENDMAILWRAPPER_HEADER'}  = $opt{'x'} || 'example.net/badthings.php for 1.2.3.4';
+$ENV{'SENDMAILWRAPPER_HEADER'}  = "x-php-script: ".$ENV{'SENDMAILWRAPPER_HEADER'};
+$ENV{'SENDMAILWRAPPER_CDDIR'}   = $opt{'d'} || '/tmp';
+$ENV{'SENDMAILWRAPPER_BINARY'}  = $opt{'p'} || sendmailwrapperBinary;
+
+use Data::Dumper;
+#print Dumper(%ENV);
+
+my $script = $php." ".sendmailwrapperDotPhp;
+print "[$script]\n";
 
 system($script);
+
+
+sub usage{
+
+return q{
+sendmailwrapper-test
+
+Part of sendmailwrapper; tests configuration. Will attempt to send an email 
+under three different sets of conditions and report on whether or not the 
+wrapper accepted them.
+
+Usage: 
+  sendmailwrapper-test [options]
+
+Options simply reset defaults:
+
+  -d <dir>      cd to <dir> for cwd-blacklist check. 
+                Default: /tmp
+  -b <body>     send <body> as mail body
+                Default: "This is just a test\n"
+  -i <path>     Set path to php.ini file containing custom sendmail_path
+                Default: /etc/php5/conf.d/sendmailwrapper.ini
+  -p <path>     set path to sendmailwrapper script
+                Default: /usr/bin/sendmailwrapper
+  -t <address>  send mail to <address>
+                Default: root@localhost
+  -x <text>     set content of x-php-script header
+                Default: "example.net/badthings.php for 1.2.3.4"
+
+};
+
+}
 
 
 

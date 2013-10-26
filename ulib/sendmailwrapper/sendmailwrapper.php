@@ -3,6 +3,7 @@ $to      = getenv("SENDMAILWRAPPER_TO");
 $subject = getenv("SENDMAILWRAPPER_SUBJECT");
 $body    = getenv("SENDMAILWRAPPER_BODY");
 $headers = getenv("SENDMAILWRAPPER_HEADER")."\r\n";
+$cddir   = getenv("SENDMAILWRAPPER_CDDIR");
 
 print "sendmail_path: " . ini_get('sendmail_path')."\n";
 print "cwd:           " . getcwd(). "\n";
@@ -16,8 +17,8 @@ print wordify(mail($to,$subject,$body));
 print "Sending mail from cwd with 'bad' x-php-script header (should fail):\n  ";
 print wordify(mail($to,$subject,$body,$headers));
 
-print "Sending mail from /tmp (should fail):\n  ";
-chdir('/tmp');
+print "Sending mail from '$cddir' (should fail):\n  ";
+chdir($cddir);
 print wordify(mail($to,$subject,$body));
 
 function wordify($retval){

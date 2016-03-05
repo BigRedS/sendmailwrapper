@@ -1,94 +1,338 @@
 #! /usr/bin/perl
 
-use strict;
+# NAME: sendmailwrapper-stats
+# VERSION: 1
+# DATE: 2015-09-27
+# AUTHOR: Avi (avi@positive-internet.com)
+# DESCRIPTION: Parse sendmailwrapper json logs, produces some summaries
 
+use strict;
+use JSON;
+use Data::Dumper;
+use Getopt::Long;
+
+my $f_config = "/etc/sendmailwrapper/sendmailwrapper.cf";
+my $munin = undef;
+my $munin_configure = undef;
+my $blacklist = undef;
+my $blacklist_summary = undef;
 my $d_logs = "/var/log/sendmailwrapper/";
-my (%pwd,%script,%client,%to,%fate);
+my $full_summary = undef;
+my $pwd_summary = undef;
+my $f_log = undef;
+my $max_output_lines = 10;
+my $hours = undef;
+my $seconds = 60 * 60 * 6; # 6 hours.
+my $field = undef;
+my $fields = undef;
+my $old_school = undef;
+my $help = undef;
+my $rate = undef;
+my $verbose = undef;
+my $debug = undef;
+my $recent = undef;
+
+GetOptions(
+	"blacklist"       => \$blacklist,
+	"blacklist-summary" => \$blacklist_summary,
+	"config-file=s"   => \$f_config,
+	"field=s"         => \$field,
+	"fields"          => \$fields,
+	"full-summary|full"  => \$full_summary,
+	"hours=i"         => \$hours,
+	"pwd-summary|pwd=s"  => \$pwd_summary,
+	"help|h"          => \$help,
+	"log-directory=s" => \$d_logs,
+	"log-file=s"      => \$f_log,
+	"munin"           => \$munin,
+	"munin-configure" => \$munin_configure,
+	"lines=i"         => \$max_output_lines,
+	"old-school"      => \$old_school,
+	"recent"          => \$recent,
+	"rate"            => \$rate,
+        "seconds|s=i"     => \$seconds,
+	"verbose"         => \$verbose,
+	"debug"           => \$debug,
+) or print "Error parsing options\n" and exit;
+my $c;
+if(!$f_log && $f_config){
+	$c = parse_config_file($f_config);
+	$f_log = $c->{'sentlog_json'};
+	$f_log = $c->{'blacklistlog_json'} if $blacklist;
+}
+if(!$f_log){
+	print STDERR "ERROR: Couldn't find a logfile. Perhaps try with --log-file\n";
+	print STDERR "ERROR: or --config-file. See --help\n";
+	exit 1;
+}
+
+usage() if $help;
+
+$blacklist = 1 if $blacklist_summary;
+$seconds = $hours * 3600 if $hours;
+
+my $oldest_log = time() - $seconds;
+
+my %stats;
 
 local $| = 1;
-print "Reading";
-foreach(listLogs()){
-	print " $_";
-	parseLog($_);
+
+# Each mode is a separate function:
+if($munin){
+	munin();
+}elsif($munin_configure){
+	munin_configure();
+}elsif($old_school){
+	old_school();
+}elsif($blacklist_summary){
+	print_stats(blacklist_summary());
+}elsif($pwd_summary =~ m/.+/){
+	print_stats(pwd_summary($pwd_summary));
+}elsif($field =~ m/.+/){
+	print sort_hash(single_field_summary($field));
+}elsif($fields){
+	list_fields();	
+}elsif($full_summary){
+	print_stats(full_summary());
+}elsif($rate){
+	mail_sending_rate();
+}else{
+	# By default, do the most useful thing and show the compromised scripts:
+	print "(run with --help to see options)\n";
+	print sort_hash(pwd_and_script_filename_summary());
 }
-print "\n";
 
-print generalStats(\%pwd, \%script, \%client, \%to, \%fate);
-
-
-sub generalStats{
-	my ($pwd,$script,$client,$to,$fate) = @_;
-	my $output;;
-	$output.= "PWDs sending the most mail:\n";
-	$output.= sortHash($pwd, 10);
-	$output.= "Scripts sending the most mail:\n";
-	$output.= sortHash($script, 10);
-	$output.= "Clients with most mail:\n";
-	$output.= sortHash($client,10);
-#	$output.= "Recipients of the most mail:\n";
-#	$output.= sortHash($to,10);
-	$output.= "Mail Stats:\n";
-	$output.="   Sent:        ".$fate->{'SENT'}."\n";
-	$output.="   Blacklisted: ".$fate->{'BLACKLIST'}."\n";
-	$output.="   Sent:        ".blacklistRatio($fate)."%\n";
-	return $output;
-}
+exit;
 
 # # # #
 # #
 #
 
-sub blacklistRatio{
-	my $fate =shift;
-	return sprintf("%02d", $fate->{'SENT'} / ($fate->{'BLACKLIST'} + $fate->{'SENT'} ) * 100);
+# Basically, these functions all ought to use decode_logs to get an 
+# array of hashrefs, and then produce something sort_hash() can print 
+# (a hash with numeric values by which the output will be sorted), or
+# just print their output themselves
+
+sub munin{
+	$blacklist = undef;
+	my $sent = get_mail_submission_rate();
+	$f_log = $c->{'blacklistlog_json'};
+	my $blacklist = get_mail_submission_rate();
+	print "sent.value $sent->{'rate'}\n";
+	print "blacklisted.value $blacklist->{'rate'}\n";
 }
 
-sub sortHash(){
+
+sub mail_sending_rate{
+	my $rate = get_mail_submission_rate();
+	if($blacklist){
+		print "$rate->{'count'} emails blacklisted in $rate->{'minutes'} minutes (since ".localtime($rate->{'first'}).")\n";
+	}else{
+		print "$rate->{'count'} emails sent in $rate->{'minutes'} minutes (since ".localtime($rate->{'first'}).")\n";
+	}
+	print "$rate->{'rate'} emails per minute\n";
+}
+
+sub single_field_summary{
+	my $field = shift;
+	my $return;
+	my @lines = decode_logs();
+	foreach my $line (@lines){
+		$return->{ $line->{$field} }++;
+	}
+	return $return;
+}
+
+sub blacklist_summary{
+	my @lines = decode_logs();
+	my $output_hash;
+	foreach my $line(@lines){
+		$output_hash->{'blacklist'}->{ $line->{'blacklist'} }++;
+		$output_hash->{'blacklist_match'}->{ $line->{'blacklist_match'} }++;
+		$output_hash->{'pwd'}->{ $line->{'pwd'} }++;
+	}
+	return $output_hash;
+}
+
+sub pwd_summary{
+	my $pwd = shift;
+	my @lines = decode_logs();
+	my $output_hash;
+	foreach my $line(@lines){
+		next unless $line->{'pwd'} =~ m/$pwd_summary/;
+		$output_hash->{'from'}->{ $line->{'from'} }++;
+		$output_hash->{'subject'}->{ $line->{'subject'} }++;
+		$output_hash->{'x-php-scriptfilename'}->{ $line->{'x-php-scriptfilename'} }++;
+	}
+	return $output_hash;
+}
+
+sub pwd_and_script_filename_summary{
+	my @lines = decode_logs();
+	my $output_hash;
+	foreach my $line (@lines){
+		my $key = $line->{'pwd'} ."  ". $line->{'x-php-scriptfilename'};
+		$output_hash->{ $key }++;
+	}
+	return $output_hash;
+}
+
+sub full_summary{
+	my @lines = decode_logs();
+	my $output_hash;
+	foreach my $line(@lines){
+		foreach my $key (keys(%{$line})){
+			$output_hash->{$key}->{ $line->{$key} }++;
+		}
+	}
+	return $output_hash;
+}
+
+
+sub list_fields{
+	my @lines = decode_logs();
+	my $line = $lines[-1];
+	foreach my $key (sort(keys(%{$line}))){
+		print $key, "\n";
+	}
+}
+
+sub old_school{
+	print "keepin' it real\n";
+	my @lines = decode_logs();
+	foreach my $line (@lines){
+		print $line->{'time'}." ".localtime($line->{'time'}). "SENT ";
+		print "PWD: $line->{'pwd'} ";
+		print "SCRIPT: $line->{'x-php-script'} ";
+		print "SCRIPTFILE: $line->{'x-php-scriptfile'} ";
+		print "TO: $line->{'to'} ";
+		print "FROM: $line->{'from'} ";
+		print "ARGS: $line->{'args_string'}\n";
+	}
+}
+#
+# #
+# # # #
+
+sub munin_configure{
+print <<EOF;
+graph_title Sendmailwrapper Stats
+graph_vlabel messages/minute
+graph_scale no
+graph_total Total
+graph_category Postfix
+sent.label Sent
+blacklisted.label Blacklisted
+EOF
+
+}
+sub get_mail_submission_rate{
+	my @lines = decode_logs();
+	my $first = $lines[0]->{'time'};
+	my $last = $lines[-1]->{'time'};
+	my $difference = $last-$first;
+	$difference = 1 if $difference = 0;
+	my $difference =  sprintf("%.2f", $difference / 60);
+	my $count = @lines;
+	my $return = { rate => sprintf("%.2f", $count/($difference + 1)), minutes => $difference, first => $first, last => $last, count => $count };
+	return $return;
+}
+sub print_stats{
 	my $hash = shift;
-	my $maxCount = shift;
+	foreach my $field(sort(keys(%{$hash}))){
+		next if $field eq 'time';
+		my $data = $hash->{$field};
+		print "$field:\n";
+		print sort_hash($data, 10);
+		print "\n";
+	}
+}
+
+sub sort_hash(){
+	my $hash = shift;
+	my $max_count = shift || $max_output_lines;
 	my $count = 0;
 	my $output;
 	foreach my $key (sort{ $hash->{$b} <=> $hash->{$a} } keys(%$hash)){
 		$count++;
-		last if $count > $maxCount;
+		last if $count > $max_count;
 		$output.= "  $hash->{$key}\t$key\n";
 	}
 	return $output;
 }
 
-sub parseLog{
-	my $f_log = shift;
-	$f_log = $d_logs."/".$f_log;
-	my $fh;
-	eval {
-		open($fh, "<", $f_log) or die "Error opening log file '$f_log' : $!";
-	};
-	if($@){
-		_warn($@);
-		return;
-	}
-	while(<$fh>){
-		if(/(\S+) (\S+) (\S+) PWD:\s*(\S+)\s+SCRIPT:\s*(\S+)\s+CLIENT:\s*(\d+\.\d+\.\d+\.\d+)\s+/){ #   TO:"*([^"]*)\s+SUBJECT:"([^"]*)/){
-#WD: (.+) SCRIPT: (.+) CLIENT: (\d+\.\d+\.\d+\.\d+) TO: "?"([^"]+)" FROM\s*"([^"]+)" SUBJECT:\s*"([^"]+)"/){
-		my ($date,$time,$fate,$pwd,$script,$client,$to,$from,$subject) = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
-#		my ($date,$time,$fate,undef,$pwd,undef,$script,undef,$client,$to) = split(/\s+/, $_);
-#		$to =~ s/^TO:"//;
-#		$to =~ s/"$//;
-			$pwd{$pwd}++;
-			$script{$script}++;
-			$client{$client}++;
-			$to{$to}++;
-			$fate{$fate}++;
-		}else{
-#			print $_."\n";
+# Figures out the logs to read (using list_logs) and reads them into an array of hashes.
+# One day will be ordered.
+
+sub decode_logs{
+	my @return_lines;
+	my @logs = list_logs();
+	print "Logfiles found: ".join(" ", @logs)."\n" if $verbose;
+	foreach my $f_log (@logs){
+		my $aggregate_hash = shift;
+		$f_log = $d_logs."/".$f_log;
+		my $fh;
+		eval {
+			print "Opening log file '$f_log'\n" if $verbose;
+			open($fh, "<", $f_log) or die "Error opening log file '$f_log' : $!";
+		};
+		if($@){
+			_warn($@);
+			return;
+		}
+		while (my $line = readline($fh)){
+			chomp($line);
+			my $values;
+			eval{	
+				$values = decode_json($line);
+			};
+			if($@){
+				print "Failed to decode line: $line\n\n" if $verbose;
+				next;
+			}
+			if( $seconds && $oldest_log > $values->{'time'}){
+				next;
+			}else{
+				print "$oldest_log <= $values->{'time'}\n" if $debug;
+			}
+			my $hash = decode_json($line);
+			push(@return_lines, $hash);
 		}
 	}
+	return @return_lines;
 }
 
-sub listLogs{
-	opendir(my $dh, $d_logs) or die ("Error opening '$d_logs' : $!");
-	my @logs = grep(/log(\.1)?$/, readdir($dh));
-#	my @logs = grep(/log$/, readdir($dh));
+# Deduces the interesting log files, returns an array of absolute paths to them.
+
+sub list_logs{
+	my $d_log = `dirname $f_log`;
+	my $log_filename = `basename $f_log`;
+	chomp $d_log;
+	chomp $log_filename;
+
+	opendir(my $dh_log, $d_log);
+	my %logfiles;
+	my @potential_logfiles = grep(/^$log_filename\.?\d*$/, readdir($dh_log));
+	print "potential_logfiles: ".join(" ", @potential_logfiles)."\n" if $debug;
+	print "Oldest log: $oldest_log (".localtime($oldest_log).")\n" if $debug;
+	foreach my $logfile (@potential_logfiles){
+		print "checking log file '$logfile'\n" if $debug;
+		my $full_path = $d_log.'/'.$logfile;
+		my $last_line = `tail -n1 $full_path`;
+		chomp ($last_line);
+		my $hash;
+		eval{ $hash = decode_json($last_line) };
+		next if ($@);
+		print "logfile time: $hash->{'time'} (".localtime($hash->{'time'}).")\n" if $debug;
+		next if $hash->{'time'} < $oldest_log;
+		print "logfile $logfile is new enough\n" if $debug;
+		%logfiles->{ $hash->{'time'}.$logfile } = $logfile;
+	}
+	my @logs;
+	foreach my $key (sort(keys(%logfiles))){
+		push (@logs, $logfiles{$key});
+	}
+	print "returned logfiles: ".join(" ", @logs)."\n" if $debug;
 	return @logs;
 }
 
@@ -97,4 +341,94 @@ sub _warn{
 	chomp $message;
 	print STDERR $message."\n";
 
+}
+
+
+sub parse_config_file{
+	my $f_config = shift;
+	open(my $fh_config, "<", $f_config) or _error("Couldn't open config file. Help! I have no idea what I'm doing!");
+	my $config;
+	while(readline($fh_config)){
+		next unless (/^\s*(\S+)\s*=\s*(.+)#?\s*/);
+		$config->{$1} = $2;
+	}
+	return $config;
+}
+
+
+sub usage{
+
+print <<EOF;
+
+Prints some stats out of the sendmailwrapper JSON logs
+
+Usage: 
+
+    sendmailwrapper-stats <options>
+
+Modes:
+
+  --blacklist
+	Use blacklist log files, not sent log files
+
+  --blacklist-summary
+	Print a summary of blacklisted PWDs and script files. Implies --blacklist
+
+  --field  <field>
+	Print a count of the ocurrences of each of the  different values of <field>
+
+  --fields
+	Print a list of the fields present in the last line of the last log (for
+	use when working out what --field will accept)
+
+  --full-summary --full
+	Print a summary of (almost) all fields, which is what the old 
+	sendmailwrapper-stats did.
+
+  --munin
+       Print output suitable for use in a munin plugin. --munin-configure prints the
+       configuration details.
+
+  --old-school
+	Print the data in the pre-JSON log format
+
+  --pwd-summary <pwd>  --pwd <pwd>
+	Print a summary of mail sent from <pwd>
+
+  --rate
+	Print the rate of mail sending 
+
+  --help  -h
+	Show this help
+
+The default mode is a summary of combinations of pwd and php script filename. 
+
+Other options:
+
+  --log-file <path>
+	Parse log at <path>, will try to find older rotations where necessary
+	(depending on --seconds value), but only uncompressed ones. Defaults
+	to the value in $f_config
+
+  --lines <num>
+	Print <num> lines in summaries (default: $max_output_lines)
+
+  --seconds <num>
+	Only use records younger than <num> seconds old (default: $seconds)
+
+  --hours <num>
+	Only use records younger than <num> hours old. Overrides --seconds
+
+Examples:
+
+To show the most prolific-sending PWDs:
+    sendmailwrapper-stats --field pwd
+
+To check what one of the top-sending PWDs has been sending:
+    sendmailwrapper-stats  --pwd /home/andeegee/public_html/forum
+
+To pretend this switch to JSON never happened:
+    sendmailwrapper-stats --old-school > sent.log 
+EOF
+exit 0
 }

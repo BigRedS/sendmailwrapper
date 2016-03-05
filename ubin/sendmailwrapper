@@ -58,17 +58,17 @@ while(<STDIN>){
 }
 
 if(-f $c->{'directoryblacklist'} || -f $c->{'pwdwhitelist'}){
-	if(directoryIsBarred($c, $emaildata)){
-		$emaildata->{'blacklist'} = "directory";
+	$emaildata = checkDirectoryBlacklist($c, $emaildata);
+	if($emaildata->{'blacklist'} =~ m/directory/){
 		_log_json($emaildata, $c->{'blacklistlog_json'});
 		blacklist($emaildata, "9");
-		
 		exit 2
 	}
 }
 
 if(-f $c->{'scriptblacklist'} || -f $c->{'scriptwhitelist'}){
-	if(scriptIsBarred()){
+	$emaildata = checkScriptBlacklist($c, $emaildata);
+	if($emaildata->{'blacklist'} =~ m/script/){
 		$emaildata->{'blacklist'} = "script";
 		_log_json($emaildata, $c->{'blacklistlog_json'});
 		blacklist($emaildata, "12");
@@ -91,31 +91,31 @@ exit 0;
 
 
 
-sub scriptIsBarred{
+sub checkScriptBlacklist{
+	my $c = shift;
+	my $emaildata = shift;
 	my $list;
-	if(defined($c->{'scriptwhitelist'})){
-		$list = getList($c->{'scriptwhitelist'});
-		unless(defined($list->{$emaildata->{'scriptfilename'}})){
-			#script is not on whitelist
-			return "script";
-		}
-	}elsif(defined($c->{'scriptblacklist'}) && defined($emaildata->{'scriptfilename'})){
+	if(defined($c->{'scriptblacklist'}) && defined($emaildata->{'x-php-originating-script'})){
 		$list = getList($c->{'scriptblacklist'});
-		if(defined($list->{$emaildata->{'scriptfilename'}})){
-			#script is on blacklist
-			$emaildata->{'blacklist_match'} = $emaildata->{'scriptfilename'};
-			$emaildata->{'blacklist'} = 'script';
-			return "script";
+		foreach(keys(%{$list})){
+			if(my $lineNumber = $emaildata->{'x-php-originating-script'} =~ m/$_/){
+				$emaildata->{'blacklist'} = "script";
+				$emaildata->{'blacklist_line'} = $lineNumber;
+				$emaildata->{'blacklist_match'} = $_;
+				return $emaildata;
+			}
 		}
 	}
 	#If we're here, script is either whitelisted or not-blacklisted.
-	return;
+	return $emaildata;
 }
 
-sub directoryIsBarred {
+sub checkDirectoryBlacklist {
 	# If the directory begins with anything on the blacklist
 	# then the mail wont be sent. If it begins with 
 	# anything on the whitelist then it will be sent. 
+	my $c = shift;
+	my $emaildata = shift;
 	my $list;
 	if(defined($c->{'directorywhitelist'})){
 		$list = getList($c->{'directorywhitelist'});
@@ -123,11 +123,11 @@ sub directoryIsBarred {
 		foreach(keys(%$list)){
 			if($emaildata->{'directory'} =~ m/^$_/){
 			#directory is whitelisted
-				return;
+				return $emaildata;
 			}
 		}
 		#if we're here, directory wasn't on the whitelist.
-		return "directory";
+		return $emaildata;
 	}elsif(defined($c->{'directoryblacklist'})){
 		$list = getList($c->{'directoryblacklist'});
 		foreach(keys(%$list)){
@@ -135,11 +135,11 @@ sub directoryIsBarred {
 				$emaildata->{'blacklist'} = "directory";
 				$emaildata->{'blackist_line'} = $lineNumber,
 				$emaildata->{'blacklist_match'} = $emaildata->{'directory'};
-				return "directory";
+				return $emaildata;
 			}
 		}
 	}
-	return;
+	return $emaildata;
 }
 
 
@@ -221,7 +221,8 @@ sub _log {
 sub _log_json {
 	my $hash = shift;
 	my $file = shift;
-	open(my $fh_log, ">>", $file) or return;
+	return unless $file;
+	open(my $fh_log, ">>", $file) or _error ("Unable to write to json log file $file\n", "noexit");
 	$hash->{'time'} = time();
 	print $fh_log encode_json($hash), "\n";
 	close($fh_log);

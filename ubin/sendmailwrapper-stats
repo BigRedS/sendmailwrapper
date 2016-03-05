@@ -14,6 +14,7 @@ use Getopt::Long;
 my $f_config = "/etc/sendmailwrapper/sendmailwrapper.cf";
 my $munin = undef;
 my $munin_configure = undef;
+my $munin_create_plugin = undef;
 my $blacklist = undef;
 my $blacklist_summary = undef;
 my $d_logs = "/var/log/sendmailwrapper/";
@@ -46,6 +47,7 @@ GetOptions(
 	"log-file=s"      => \$f_log,
 	"munin"           => \$munin,
 	"munin-configure" => \$munin_configure,
+	"munin-create-plugin" => \$munin_create_plugin,
 	"lines=i"         => \$max_output_lines,
 	"old-school"      => \$old_school,
 	"recent"          => \$recent,
@@ -54,6 +56,7 @@ GetOptions(
 	"verbose"         => \$verbose,
 	"debug"           => \$debug,
 ) or print "Error parsing options\n" and exit;
+usage() if $help;
 my $c;
 if(!$f_log && $f_config){
 	$c = parse_config_file($f_config);
@@ -66,7 +69,6 @@ if(!$f_log){
 	exit 1;
 }
 
-usage() if $help;
 
 $blacklist = 1 if $blacklist_summary;
 $seconds = $hours * 3600 if $hours;
@@ -82,6 +84,8 @@ if($munin){
 	munin();
 }elsif($munin_configure){
 	munin_configure();
+}elsif($munin_create_plugin){
+	munin_create_plugin();
 }elsif($old_school){
 	old_school();
 }elsif($blacklist_summary){
@@ -214,6 +218,18 @@ sub old_school{
 # #
 # # # #
 
+sub munin_create_plugin{
+print <<EOF
+#! /bin/bash
+if [[ $1 ]]; then
+        sendmailwrapper-stats --munin-configure
+        exit;
+fi
+sendmailwrapper-stats --munin --seconds 600
+EOF
+}
+
+
 sub munin_configure{
 print <<EOF;
 graph_title Sendmailwrapper Stats
@@ -326,7 +342,7 @@ sub list_logs{
 		print "logfile time: $hash->{'time'} (".localtime($hash->{'time'}).")\n" if $debug;
 		next if $hash->{'time'} < $oldest_log;
 		print "logfile $logfile is new enough\n" if $debug;
-		%logfiles->{ $hash->{'time'}.$logfile } = $logfile;
+		$logfiles{ $hash->{'time'}.$logfile } = $logfile;
 	}
 	my @logs;
 	foreach my $key (sort(keys(%logfiles))){
@@ -346,7 +362,7 @@ sub _warn{
 
 sub parse_config_file{
 	my $f_config = shift;
-	open(my $fh_config, "<", $f_config) or _error("Couldn't open config file. Help! I have no idea what I'm doing!");
+	open(my $fh_config, "<", $f_config) or die("Couldn't open config file $f_config : $!");
 	my $config;
 	while(readline($fh_config)){
 		next unless (/^\s*(\S+)\s*=\s*(.+)#?\s*/);

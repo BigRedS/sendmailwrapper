@@ -8,11 +8,12 @@
 # set both the whitelist is canonical and the blacklist is simply 
 # never read
 
-# The pwd check includes subdirectories - if the pwd of the
-# email begins with something on the list, that's a match. It
-# is a naive string match, rather than a true subdir check.
-pwdblacklist = /etc/sendmailwrapper/pwdblacklist
-#pwdwhitelist = /etc/sendmailwrapper/pwdwhitelist
+# The directory check includes subdirectories - if the working 
+# directory of the email begins with something on the list, 
+# that's a match. It is a naive string match, rather than a true 
+# subdir check.
+directoryblacklist = /etc/sendmailwrapper/directoryblacklist
+#directorywhitelist = /etc/sendmailwrapper/directorywhitelist
 
 # The script check works on an exact match. The script name is 
 # taken to be everything beyond the last forward-slash in the

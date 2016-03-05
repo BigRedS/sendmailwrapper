@@ -18,7 +18,7 @@ my $blacklist = undef;
 my $blacklist_summary = undef;
 my $d_logs = "/var/log/sendmailwrapper/";
 my $full_summary = undef;
-my $pwd_summary = undef;
+my $directory_summary = undef;
 my $f_log = undef;
 my $max_output_lines = 10;
 my $hours = undef;
@@ -40,7 +40,7 @@ GetOptions(
 	"fields"          => \$fields,
 	"full-summary|full"  => \$full_summary,
 	"hours=i"         => \$hours,
-	"pwd-summary|pwd=s"  => \$pwd_summary,
+	"directory-summary|directory=s"  => \$directory_summary,
 	"help|h"          => \$help,
 	"log-directory=s" => \$d_logs,
 	"log-file=s"      => \$f_log,
@@ -86,8 +86,8 @@ if($munin){
 	old_school();
 }elsif($blacklist_summary){
 	print_stats(blacklist_summary());
-}elsif($pwd_summary =~ m/.+/){
-	print_stats(pwd_summary($pwd_summary));
+}elsif($directory_summary =~ m/.+/){
+	print_stats(directory_summary($directory_summary));
 }elsif($field =~ m/.+/){
 	print sort_hash(single_field_summary($field));
 }elsif($fields){
@@ -99,7 +99,7 @@ if($munin){
 }else{
 	# By default, do the most useful thing and show the compromised scripts:
 	print "(run with --help to see options)\n";
-	print sort_hash(pwd_and_script_filename_summary());
+	print sort_hash(directory_and_script_filename_summary());
 }
 
 exit;
@@ -149,17 +149,17 @@ sub blacklist_summary{
 	foreach my $line(@lines){
 		$output_hash->{'blacklist'}->{ $line->{'blacklist'} }++;
 		$output_hash->{'blacklist_match'}->{ $line->{'blacklist_match'} }++;
-		$output_hash->{'pwd'}->{ $line->{'pwd'} }++;
+		$output_hash->{'directory'}->{ $line->{'directory'} }++;
 	}
 	return $output_hash;
 }
 
-sub pwd_summary{
-	my $pwd = shift;
+sub directory_summary{
+	my $directory = shift;
 	my @lines = decode_logs();
 	my $output_hash;
 	foreach my $line(@lines){
-		next unless $line->{'pwd'} =~ m/$pwd_summary/;
+		next unless $line->{'directory'} =~ m/$directory_summary/;
 		$output_hash->{'from'}->{ $line->{'from'} }++;
 		$output_hash->{'subject'}->{ $line->{'subject'} }++;
 		$output_hash->{'x-php-scriptfilename'}->{ $line->{'x-php-scriptfilename'} }++;
@@ -167,11 +167,11 @@ sub pwd_summary{
 	return $output_hash;
 }
 
-sub pwd_and_script_filename_summary{
+sub directory_and_script_filename_summary{
 	my @lines = decode_logs();
 	my $output_hash;
 	foreach my $line (@lines){
-		my $key = $line->{'pwd'} ."  ". $line->{'x-php-scriptfilename'};
+		my $key = $line->{'directory'} ."  ". $line->{'x-php-scriptfilename'};
 		$output_hash->{ $key }++;
 	}
 	return $output_hash;
@@ -202,7 +202,7 @@ sub old_school{
 	my @lines = decode_logs();
 	foreach my $line (@lines){
 		print $line->{'time'}." ".localtime($line->{'time'}). "SENT ";
-		print "PWD: $line->{'pwd'} ";
+		print "directory: $line->{'directory'} ";
 		print "SCRIPT: $line->{'x-php-script'} ";
 		print "SCRIPTFILE: $line->{'x-php-scriptfile'} ";
 		print "TO: $line->{'to'} ";
@@ -372,7 +372,7 @@ Modes:
 	Use blacklist log files, not sent log files
 
   --blacklist-summary
-	Print a summary of blacklisted PWDs and script files. Implies --blacklist
+	Print a summary of blacklisted directories and script files. Implies --blacklist
 
   --field  <field>
 	Print a count of the ocurrences of each of the  different values of <field>
@@ -392,8 +392,8 @@ Modes:
   --old-school
 	Print the data in the pre-JSON log format
 
-  --pwd-summary <pwd>  --pwd <pwd>
-	Print a summary of mail sent from <pwd>
+  --directory-summary <directory>  --directory <directory>
+	Print a summary of mail sent from <directory>
 
   --rate
 	Print the rate of mail sending 
@@ -401,7 +401,7 @@ Modes:
   --help  -h
 	Show this help
 
-The default mode is a summary of combinations of pwd and php script filename. 
+The default mode is a summary of combinations of directory and php script filename. 
 
 Other options:
 
@@ -421,11 +421,11 @@ Other options:
 
 Examples:
 
-To show the most prolific-sending PWDs:
-    sendmailwrapper-stats --field pwd
+To show the most prolific-sending directories:
+    sendmailwrapper-stats --field directory
 
-To check what one of the top-sending PWDs has been sending:
-    sendmailwrapper-stats  --pwd /home/andeegee/public_html/forum
+To check what one of the top-sending directories has been sending:
+    sendmailwrapper-stats  --directory /home/andeegee/public_html/forum
 
 To pretend this switch to JSON never happened:
     sendmailwrapper-stats --old-school > sent.log 

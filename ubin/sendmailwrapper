@@ -19,7 +19,7 @@ $c->{'errorlog'} = "/tmp/sendmailwrapper.error" if(!defined($c->{'errorlog'}));
 my $emaildata;
 
 $emaildata->{'args_string'} = join(" ", @ARGV);
-$emaildata->{'pwd'} = $ENV{'PWD'};
+$emaildata->{'directory'} = $ENV{'PWD'};
 $emaildata->{'apache_run_user'} = $ENV{'APACHE_RUN_USER'};
 $emaildata->{'apache_run_group'} = $ENV{'APACHE_RUN_GROUP'};
 
@@ -57,9 +57,9 @@ while(<STDIN>){
 	push(@message, $_);
 }
 
-if(-f $c->{'pwdblacklist'} || -f $c->{'pwdwhitelist'}){
-	if(pwdIsBarred($c, $emaildata)){
-		$emaildata->{'blacklist'} = "pwd";
+if(-f $c->{'directoryblacklist'} || -f $c->{'pwdwhitelist'}){
+	if(directoryIsBarred($c, $emaildata)){
+		$emaildata->{'blacklist'} = "directory";
 		_log_json($emaildata, $c->{'blacklistlog_json'});
 		blacklist($emaildata, "9");
 		
@@ -112,30 +112,30 @@ sub scriptIsBarred{
 	return;
 }
 
-sub pwdIsBarred {
-	# If the PWD begins with anything on the blacklist
+sub directoryIsBarred {
+	# If the directory begins with anything on the blacklist
 	# then the mail wont be sent. If it begins with 
 	# anything on the whitelist then it will be sent. 
 	my $list;
-	if(defined($c->{'pwdwhitelist'})){
-		$list = getList($c->{'pwdwhitelist'});
+	if(defined($c->{'directorywhitelist'})){
+		$list = getList($c->{'directorywhitelist'});
 		my $whitelisted = 0;
 		foreach(keys(%$list)){
-			if($emaildata->{'pwd'} =~ m/^$_/){
-			#pwd is whitelisted
+			if($emaildata->{'directory'} =~ m/^$_/){
+			#directory is whitelisted
 				return;
 			}
 		}
-		#if we're here, pwd wasn't on the whitelist.
-		return "pwd";
-	}elsif(defined($c->{'pwdblacklist'})){
-		$list = getList($c->{'pwdblacklist'});
+		#if we're here, directory wasn't on the whitelist.
+		return "directory";
+	}elsif(defined($c->{'directoryblacklist'})){
+		$list = getList($c->{'directoryblacklist'});
 		foreach(keys(%$list)){
-			if(my $lineNumber = $emaildata->{'pwd'} =~ m/^$_/){
-				$emaildata->{'blacklist'} = "pwd";
+			if(my $lineNumber = $emaildata->{'directory'} =~ m/^$_/){
+				$emaildata->{'blacklist'} = "directory";
 				$emaildata->{'blackist_line'} = $lineNumber,
-				$emaildata->{'blacklist_match'} = $emaildata->{'pwd'};
-				return "pwd";
+				$emaildata->{'blacklist_match'} = $emaildata->{'directory'};
+				return "directory";
 			}
 		}
 	}
@@ -200,13 +200,13 @@ sub createLogLine{
 	}else{
 		$l.=" SENT ";
 	}
-	$l.= "PWD: $data->{'pwd'} ";
+	$l.= "directory: $data->{'pwd'} ";
 	$l.= "SCRIPT: $data->{'script'} ";
 	$l.= "SCRIPTFILE: $data->{'scriptfilename'} ";
 #	$l.= "CLIENT: $data->{'client'} ";
 	$l.= "TO: $data->{'to'} ";
 	$l.= "FROM: $data->{'from'} ";
-#	$l.= "PWD: $data->{'pwd'} ";
+#	$l.= "directory: $data->{'pwd'} ";
 	$l.= "ARGS: $data->{'args_string'}";
 	$l.= "\n";
 	return $l

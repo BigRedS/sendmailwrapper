@@ -8,4 +8,5 @@ maintainer: "Avi Greenbury <ialoneambest@gmail.com>"
 package: sendmailwrapper
 requires: 
   perl: 0
+  libjson-perl: 0
 postinst: postinst

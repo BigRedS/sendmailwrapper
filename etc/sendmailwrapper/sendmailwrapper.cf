@@ -30,6 +30,10 @@ sendmail = /usr/lib/sendmail
 sentlog = /var/log/sendmailwrapper/sent.log
 blacklistlog = /var/log/sendmailwrapper/blacklisted.log
 
+sentlog_json = /var/log/sendmailwrapper/sent.json.log
+blacklistlog_json = /var/log/sendmailwrapper/blacklisted.json.log
+
+
 # Most errors are caused by a lack of permission to read or write 
 # somewhere, error log defaults to being in /tmp where everybody 
 # should be able to read:

@@ -3,6 +3,12 @@ mkdir -p /var/log/sendmailwrapper || exit 1
 chmod a+wx /var/log/sendmailwrapper || exit 2
 chmod a+r /var/log || exit 3
 
-if[ -e /etc/sendmailwrapper/pwdblacklist ]; then
-	cat /etc/sendmailwrapper/pwdblacklist >> /etc/sendmailwrapper/directoryblacklist && rm /etc/sendmailwrapper/pwdblacklist;
+if [ -f /etc/sendmailwrapper/pwdblacklisti ]; then
+        if [ -f /etc/sendmailwrapper/directoryblacklist ]; then
+                cat /etc/sendmailwrapper/pwdblacklist >> /etc/sendmailwrapper/directoryblacklist
+                rm /etc/sendmailwrapper/pwdblacklist;
+        else
+                mv /etc/sendmailwrapper/pwdblacklist /etc/sendmailwrapper/directoryblacklist
+        fi
 fi
+

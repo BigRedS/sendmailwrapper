@@ -3,20 +3,35 @@ mkdir -p /var/log/sendmailwrapper || exit 1
 chmod a+wx /var/log/sendmailwrapper || exit 2
 chmod a+r /var/log || exit 3
 
-if [ -f /etc/sendmailwrapper/pwdblacklisti ]; then
+# Deal with the pwdblacklist->directoryblacklist switch
+if [ -f /etc/sendmailwrapper/pwdblacklist ]; then
         if [ -f /etc/sendmailwrapper/directoryblacklist ]; then
+		echo "pwdblacklist and directoryblacklist both exist; merging into directoryblacklist"
                 cat /etc/sendmailwrapper/pwdblacklist >> /etc/sendmailwrapper/directoryblacklist
                 rm /etc/sendmailwrapper/pwdblacklist;
         else
+		echo "old pwdblacklist found; moving to /etc/sendmailwrapper/directoryblacklist"
                 mv /etc/sendmailwrapper/pwdblacklist /etc/sendmailwrapper/directoryblacklist
         fi
 fi
 
+# Create a munin plugin
 if [ -d /etc/munin/plugins ]; then
 	if [ -f /etc/munin/plugins/sendmailwrapper ]; then
-		echo "ERROR: Failed to create munin plugin; file /etc/munin/plugins/sendmailwrapper already exists";
+		echo "Failed to create munin plugin; file /etc/munin/plugins/sendmailwrapper already exists";
+		echo "Carrying on with package installation";
 	else
+		echo "Creating munin plugin"
 		sendmailwrapper-stats --munin-create-plugin > /etc/munin/plugins/sendmailwrapper
 		/etc/init.d/munin-node restart
 	fi
+fi
+
+# Create example blacklist files, with comments
+if [ ! -f /etc/sendmailwrapper/directoryblacklist ]; then
+	echo "#/tmp" > /etc/sendmailwrapper/directoryblacklist
+fi
+
+if [ ! -f /etc/sendmailwrapper/scriptblacklist ]; then
+	echo "#eval\(\)'d" > /etc/sendmailwrapper/scriptblacklist
 fi

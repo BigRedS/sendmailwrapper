@@ -16,7 +16,7 @@ if [ -d /etc/munin/plugins ]; then
 	if [ -f /etc/munin/plugins/sendmailwrapper ]; then
 		echo "ERROR: Failed to create munin plugin; file /etc/munin/plugins/sendmailwrapper already exists";
 	else
-		sendmailwrapper --munin-create-plugin > /etc/munin/plugins/sendmailwrapper
+		sendmailwrapper-stats --munin-create-plugin > /etc/munin/plugins/sendmailwrapper
 		/etc/init.d/munin-node restart
 	fi
 fi

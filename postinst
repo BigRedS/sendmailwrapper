@@ -39,3 +39,7 @@ fi
 if [ ! -f /etc/sendmailwrapper/combinationblacklist]; then
 	echo "#/tmp spam.php" > /etc/sendmailwrapper/combinationblacklist
 fi
+
+if [ ! -f /etc/sendmailwrapper/recipientblacklist]; then
+	echo "#bill@microsoft.com" > /etc/sendmailwrapper/recipientblacklist
+fi

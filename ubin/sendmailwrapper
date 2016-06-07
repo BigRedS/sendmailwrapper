@@ -91,6 +91,15 @@ if(-f $c->{'combinationblacklist'}){
 	}
 }
 
+if(-f $c->{'recipientblacklist'}){
+	$emaildata = checkRecipientBlacklist($c, $emaildata);
+	if($emaildata->{'blacklist'} =~ m/recipient/){
+		$emaildata->{'blacklist'} = 'recipient';
+		_log_json($emaildata, $c->{'blacklistlog_json'});
+		blacklist($emaildata, "14");
+		exit 2;
+	}
+}
 
 # Write to the log, send the mail and exit:
 _log();
@@ -168,6 +177,30 @@ sub checkDirectoryBlacklist {
 				$emaildata->{'blacklist'} = "directory";
 				$emaildata->{'blackist_line'} = $lineNumber,
 				$emaildata->{'blacklist_match'} = $emaildata->{'directory'};
+				return $emaildata;
+			}
+		}
+	}
+	return $emaildata;
+}
+
+sub checkRecipientBlacklist{
+	my $c = shift;
+	my $emaildata = shift;
+	my $list;
+	if(defined($c->{'recipientblacklist'}) && defined($emaildata->{'to'})){
+		if($emaildata->{'to'} =~ m/\b(\S+@\S+)\b/g){
+			$to = $1;
+		}else{
+			return $emaildata;
+		}
+		$emaildata->{'recipient_to'} = $to;
+		$list = getList($c->{'recipientblacklist'});
+		foreach(keys(%{$list})){
+			if(my $lineNumber = $to =~ m/^$_$/){
+				$emaildata->{'blacklist'} = 'recipient';
+				$emaildata->{'blacklist_line'} = $lineNumber;
+				$emaildata->{'blacklist_match'} = $to;
 				return $emaildata;
 			}
 		}

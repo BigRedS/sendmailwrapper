@@ -25,8 +25,12 @@ scriptblacklist = /etc/sendmailwrapper/scriptblacklist
 # working directory. You should be able to copy straight from
 # the output of sendmailwrapper-stats into this file, removing
 # just the count.
-
 combinationblacklist = /etc/sendmailwrapper/combinationblacklist
+
+# The recipientblacklist makes an attempt to get an email address
+# out of the 'To:' line and tests against that; it doesn't use
+# the whole of the line itself. It requires an exact match.
+recipientblacklist = /etc/sendmailwrapper/recipientblacklist
 
 # The sendmail binary around which we shall wrap. Arguments are
 # passed straight on unchanged.

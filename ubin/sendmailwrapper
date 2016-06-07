@@ -18,6 +18,8 @@ $emaildata->{'apache_run_user'} = $ENV{'APACHE_RUN_USER'};
 $emaildata->{'apache_run_group'} = $ENV{'APACHE_RUN_GROUP'};
 
 my ($to, $from, $subject, $phpScript, $client, @message);
+my $sendmailwrapper_message_id;
+my $sendmailwrapper_id_appended = 0;
 while(<STDIN>){
 	if (/^to:\s*(.+)\s*$/i){ 
 		$emaildata->{'to'} = $1;
@@ -48,6 +50,15 @@ while(<STDIN>){
 	}elsif(/^X-Mailer:\s*(.+)\s*$/){
 		$emaildata->{'mailer'} = $1;
 	}
+
+	if( ($sendmailwrapper_id_appended == 0) and (defined($emaildata->{'directory'})) and (defined($emaildata->{'x-php-scriptfilename'})) ){
+		my $sendmailwrapper_id = unpack("H*", $emaildata->{'directory'}.$emaildata->{'x-php-scriptfilename'});
+		$emaildata->{'source-id'} = $sendmailwrapper_id;
+		$sendmailwrapper_id.="\n";
+		push(@message, "X-Sendmailwrapper-id: $sendmailwrapper_id");
+		$sendmailwrapper_id_appended++;
+	}
+
 	push(@message, $_);
 }
 

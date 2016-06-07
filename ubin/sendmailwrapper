@@ -52,7 +52,7 @@ while(<STDIN>){
 	}
 
 	if( ($sendmailwrapper_id_appended == 0) and (defined($emaildata->{'directory'})) and (defined($emaildata->{'x-php-scriptfilename'})) ){
-		my $sendmailwrapper_id = unpack("H*", $emaildata->{'directory'}.$emaildata->{'x-php-scriptfilename'});
+		my $sendmailwrapper_id = unpack("H*", $emaildata->{'directory'} ^ $emaildata->{'x-php-scriptfilename'});
 		$emaildata->{'source-id'} = $sendmailwrapper_id;
 		$sendmailwrapper_id.="\n";
 		push(@message, "X-Sendmailwrapper-id: $sendmailwrapper_id");

@@ -21,6 +21,13 @@ directoryblacklist = /etc/sendmailwrapper/directoryblacklist
 scriptblacklist = /etc/sendmailwrapper/scriptblacklist
 #scriptwhitelist = /etc/sendmwailwrapper/scriptwhitelist
 
+# This checks for a combination of the script filename and the
+# working directory. You should be able to copy straight from
+# the output of sendmailwrapper-stats into this file, removing
+# just the count.
+
+combinationblacklist = /etc/sendmailwrapper/combinationblacklist
+
 # The sendmail binary around which we shall wrap. Arguments are
 # passed straight on unchanged.
 sendmail = /usr/lib/sendmail

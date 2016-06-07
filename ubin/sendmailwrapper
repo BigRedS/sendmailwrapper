@@ -70,6 +70,16 @@ if(-f $c->{'scriptblacklist'} || -f $c->{'scriptwhitelist'}){
 	}
 }
 
+if(-f $c->{'combinationblacklist'}){
+	$emaildata = checkCombinationBlacklist($c, $emaildata);
+	if($emaildata->{'blacklist'} =~ m/combination/){
+		$emaildata->{'blacklist'} = 'combination';
+		_log_json($emaildata, $c->{'blacklistlog_json'});
+		blacklist($emaildata, "6");
+		exit 2
+	}
+}
+
 
 # Write to the log, send the mail and exit:
 _log();
@@ -83,6 +93,24 @@ exit 0;
 # #  
 #
 
+sub checkCombinationBlacklist{
+	my $c = shift;
+	my $emaildata = shift;
+	my $list;
+	if( defined($emaildata->{'x-php-scriptfilename'}) and defined($emaildata->{'directory'}) ){
+		$list = getList($c->{'combinationblacklist'});
+		foreach my $line (keys(%{$list})){
+			my ($directory,$script) = split(m/\s+/, $line);
+			if(($directory eq $emaildata->{'directory'}) and ($script eq $emaildata->{'x-php-scriptfilename'})){
+				$emaildata->{'blacklist'} = "combination";
+				$emaildata->{'blacklist_line'} = $list->{$line};
+				$emaildata->{'blacklist_match'} = $line;
+				return $emaildata;
+			}
+		}
+	}
+	return $maildata;
+}
 
 
 sub checkScriptBlacklist{

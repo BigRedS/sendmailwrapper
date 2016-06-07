@@ -35,3 +35,7 @@ fi
 if [ ! -f /etc/sendmailwrapper/scriptblacklist ]; then
 	echo "#eval\(\)'d" > /etc/sendmailwrapper/scriptblacklist
 fi
+
+if [ ! -f /etc/sendmailwrapper/combinationblacklist]; then
+	echo "#/tmp spam.php" > /etc/sendmailwrapper/combinationblacklist
+fi

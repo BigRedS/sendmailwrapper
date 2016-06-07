@@ -193,12 +193,13 @@ sub getList{
 		return;
 	}
 	my $list;
-	my $lineNumber = 1;
+	my $lineNumber = 0;
 	while(readline($fh_list)){
+		$lineNumber++;
 		chomp;
 		next if $_ eq '';
+		next if $_ =~ m/^\s*#/;
 		$list->{$_} = $lineNumber;
-		$lineNumber++;
 	}
 	return $list;
 }

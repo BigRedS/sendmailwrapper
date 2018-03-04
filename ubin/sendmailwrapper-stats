@@ -37,7 +37,6 @@ GetOptions(
 	"blacklist"       => \$blacklist,
 	"blacklist-summary" => \$blacklist_summary,
 	"config-file=s"   => \$f_config,
-	"field=s"         => \$field,
 	"fields"          => \$fields,
 	"full-summary|full"  => \$full_summary,
 	"hours=i"         => \$hours,
@@ -90,10 +89,10 @@ if($munin){
 	old_school();
 }elsif($blacklist_summary){
 	print_stats(blacklist_summary());
+
+
 }elsif($directory_summary =~ m/.+/){
 	print_stats(directory_summary($directory_summary));
-}elsif($field =~ m/.+/){
-	print sort_hash(single_field_summary($field));
 }elsif($fields){
 	list_fields();	
 }elsif($full_summary){
@@ -137,26 +136,7 @@ sub mail_sending_rate{
 	print "$rate->{'rate'} emails per minute\n";
 }
 
-sub single_field_summary{
-	my $field = shift;
-	my $return;
-	my @lines = decode_logs();
-	foreach my $line (@lines){
-		$return->{ $line->{$field} }++;
-	}
-	return $return;
-}
 
-sub blacklist_summary{
-	my @lines = decode_logs();
-	my $output_hash;
-	foreach my $line(@lines){
-		$output_hash->{'blacklist'}->{ $line->{'blacklist'} }++;
-		$output_hash->{'blacklist_match'}->{ $line->{'blacklist_match'} }++;
-		$output_hash->{'directory'}->{ $line->{'directory'} }++;
-	}
-	return $output_hash;
-}
 
 sub directory_summary{
 	my $directory = shift;
@@ -389,9 +369,6 @@ Modes:
 
   --blacklist-summary
 	Print a summary of blacklisted directories and script files. Implies --blacklist
-
-  --field  <field>
-	Print a count of the ocurrences of each of the  different values of <field>
 
   --fields
 	Print a list of the fields present in the last line of the last log (for

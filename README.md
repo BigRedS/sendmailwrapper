@@ -1,33 +1,54 @@
-Sendmailwrapper is a script which is called by PHP as if it were 
-`sendmailwrapper`, inspects the mail it is sent and either goes on to actually 
-send the mail (via sendmailwrapper) to to discard it, logging some information 
-about the mail.
+# Sendmailwrapper
 
-Decisions are made based on the working directory in which the script is called 
-(which, generally, is the DocumentRoot of the site) and on the content of the 
-`X-PHP-Originating-Script` header which is present by default from about PHP 5.3
-onwards.
+A wrapper round sendmail, probably for PHP. 
 
+# Installation
 
-/etc/sendmailwrapper/directoryblacklist contains a list of paths; if the path 
-of the working directory begins with any element in this list, the mail is not 
-sent. It has one entry by default: `/tmp`
+This is laid out for packaging by Debosh. If you're not using that, read on!
 
-/etc/sendmailwrapper/scriptblacklist contains a list of strings; if the 
-X-PHP-Originating-Script header's content matches this, then the mail is not 
-sent. It has one entry by default: `eval\(\)'d code`
+First, copy the contents of the  `ubin` directory into `/usr/bin`, which will 
+give you
 
+    /usr/bin/sendmailwrapper  
+    /usr/bin/sendmailwrapper-stats  
+    /usr/bin/sendmailwrapper-test
 
-The two blacklists are matched in a Perl regex, but the directory one is
-anchored to the beginning of the path; you'll need to escape-out any characters
-special to Perl regexes.
+Then configure PHP to use `/usr/bin/sendmailwrapper` as its `sendmail_path`; the
+file at `etc/php5/conf.d/sendmailwrapper.ini` should be useful here, but the 
+config is just
 
+    sendmail_path = "/usr/bin/sendmailwrapper -t -i"
 
+And then all messages sent by PHP will be logged to
 
-There is also a tool called `sendmailwrapper-stats`, which can parse the logs 
-and give hopefully-useful information about them. It's got a fairly 
-comprehensive --help, try `sendmailwrapper-stats --help`.
+    /var/log/sendmailwrapper/sendmailwrapper.json.log
+    /var/log/sendmailwrapper/sendmailwrapper.log
 
-Finally, there's a munin plugin, which is created by calling 
-sendmailwrapper-stats with the (undocumented) option of --munin-create-plugin; 
-the postinstall script creates this.
+The former's a series of JSON-encoded lines (sorry) and the latter's more for 
+human consumption.
+
+`/usr/bin/sendmailwrapper-stats` can parse the json.log and offer you some 
+statistics, and `/usr/bin/sendmailwrapper-test` can be used to test the 
+configuration; see each of their `--help` outputs for more info there.
+
+# Configuration
+
+Sendmailwrapper checks three properties of the message:
+
+* the working directory of the process submitting the message
+* the name of the script submitting the message (from the PHP headers)
+* the recipient address of the message
+* the full path to the script ('combination')
+
+For each of these it first checks for the presence of a whitelist; if one 
+exists, then processing continues only if the property is listed. If there is
+no whitelist, it consults a blacklist, and continues unless the property is on
+the list.
+
+If processing stops (because an element was absent from a whitelist or present 
+on a blacklist) the script exits 2, causing PHP's `mail()` to return false.
+
+If the message is allowed to continue, a header is added to the message, called
+`X-Sendmailwrapper-id` and created as a long string based on the PHP filename 
+(from the PHP headers) and the working directory; the intention here is to 
+provide an easy way to identify messages all sent from the same source.
